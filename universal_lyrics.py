@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import html
 import json
+import os
 import re
 import signal
 import subprocess
@@ -30,6 +31,7 @@ CACHE_DIR = Path("/tmp/lyrics_cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 DAEMON_OUTPUT_FILE = Path("/tmp/lyrics-daemon.json")
+DAEMON_PID_FILE = Path("/tmp/lyrics-daemon.pid")
 
 PLAYER_ORDER = ["brave", "spotify"]
 
@@ -634,6 +636,13 @@ class LyricsDaemon:
             print(json.dumps({"status": "error", "lines": []}))
             sys.exit(1)
 
+        # Write PID file
+        try:
+            DAEMON_PID_FILE.write_text(str(os.getpid()))
+        except Exception as e:
+            print(f"[ERROR] Failed to write PID file: {e}", file=sys.stderr)
+            # Proceed even if PID file write fails, but log it.
+
         # Daemon startup notification
         print(
             f"[INFO] Lyrics daemon started. Output file: {DAEMON_OUTPUT_FILE}",
@@ -641,22 +650,31 @@ class LyricsDaemon:
         )
         sys.stderr.flush()
 
-        while self.running:
-            loop_start = time.time()
+        try:
+            while self.running:
+                loop_start = time.time()
 
-            try:
-                self._process_iteration()
-            except Exception as e:
-                # Log error but keep running
-                import traceback
+                try:
+                    self._process_iteration()
+                except Exception as e:
+                    # Log error but keep running
+                    import traceback
 
-                print(f"[ERROR] {e}", file=sys.stderr)
-                traceback.print_exc(file=sys.stderr)
+                    print(f"[ERROR] {e}", file=sys.stderr)
+                    traceback.print_exc(file=sys.stderr)
 
-            # Sleep to maintain 20Hz update rate
-            elapsed = time.time() - loop_start
-            sleep_time = max(0, self.UPDATE_INTERVAL - elapsed)
-            time.sleep(sleep_time)
+                # Sleep to maintain 20Hz update rate
+                elapsed = time.time() - loop_start
+                sleep_time = max(0, self.UPDATE_INTERVAL - elapsed)
+                time.sleep(sleep_time)
+        finally:
+            # Clean up PID file on exit
+            if DAEMON_PID_FILE.exists():
+                try:
+                    DAEMON_PID_FILE.unlink()
+                except Exception:
+                    pass
+            print("[INFO] Lyrics daemon stopped.", file=sys.stderr)
 
     def _process_iteration(self) -> None:
         """Process one iteration of the daemon loop."""

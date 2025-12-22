@@ -5,9 +5,28 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PID_FILE="/tmp/lyrics-daemon.pid"
 
 # Kill any existing daemon instance
-pkill -f "universal_lyrics.py --daemon" 2>/dev/null || true
+if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "[Lyrics Daemon] Stopping existing daemon (PID: $PID)..."
+        kill "$PID"
+        # Wait for process to exit
+        for i in {1..10}; do
+            if ! kill -0 "$PID" 2>/dev/null; then
+                break
+            fi
+            sleep 0.1
+        done
+    fi
+    # Ensure PID file is removed if it still exists (stale)
+    rm -f "$PID_FILE"
+else
+    # Fallback to pkill if PID file is missing
+    pkill -f "universal_lyrics.py --daemon" 2>/dev/null || true
+fi
 
 # Wait a moment for the process to fully terminate
 sleep 0.5
