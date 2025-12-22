@@ -37,6 +37,11 @@ MPRISへの負荷を抑えるため、再生位置を補完 **SHALL** しなけ�
     1. `mpris:trackid` が前回のIDと異なる場合
     2. トラックIDが無い場合、`xesam:title` または `xesam:artist` が前回の値と異なる場合
 
+#### Scenario: Action on Change
+- **WHEN** 楽曲の変更が検知される
+- **THEN** 直ちに内部のメタデータ（タイトル、アーティスト）を更新しなければならない。
+- **AND** 新しいメタデータに基づいて歌詞の再取得（キャッシュ確認または新規検索）を実行しなければならない。
+
 ### Requirement: Daemon Execution
 継続的な監視を行い、結果を外部ファイルへ出力 **MUST** しなければならない。
 
