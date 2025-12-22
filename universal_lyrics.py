@@ -617,6 +617,7 @@ class LyricsDaemon:
         self.interpolator = PositionInterpolator()
         self.track_manager = TrackStateManager(CACHE_DIR)
         self.last_priority_check = 0.0
+        self.last_status = None
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -716,6 +717,11 @@ class LyricsDaemon:
             # Update interpolator
             self.interpolator.update_from_mpris(state)
 
+            # Log status change
+            if state["status"] != self.last_status:
+                print(f"[INFO] Player status changed: {self.last_status} -> {state['status']} (Player: {self.monitor.current_player_name})", file=sys.stderr)
+                self.last_status = state["status"]
+
         # Get interpolated position
         position = self.interpolator.get_interpolated_position()
 
@@ -778,19 +784,12 @@ class LyricsDaemon:
             self.monitor.current_player = None
             return
 
-        print(
-            f"[DEBUG] _check_priority: Current player: {current_identity}",
-            file=sys.stderr,
-        )
-
         # 現在のプレイヤーの優先順位を取得
         current_priority = None
         for i, priority_name in enumerate(self.monitor.player_order):
             if priority_name.lower() in current_identity.lower():
                 current_priority = i
                 break
-
-        print(f"[DEBUG] Current priority index: {current_priority}", file=sys.stderr)
 
         if current_priority is None:
             # 現在のプレイヤーが優先リストにない → 再検索
@@ -806,7 +805,6 @@ class LyricsDaemon:
         # より優先順位の高いプレイヤーが再生中かチェック
         for i in range(current_priority):
             priority_name = self.monitor.player_order[i]
-            print(f"[DEBUG] Checking higher priority: {priority_name}", file=sys.stderr)
 
             # 利用可能なプレイヤーの中から部分一致で検索
             for player_addr in available:
@@ -816,14 +814,10 @@ class LyricsDaemon:
                     # Match against identity, not bus name
                     if priority_name.lower() in identity.lower():
                         status = mp.player.PlaybackStatus
-                        print(
-                            f"[DEBUG]   Checking {identity} ({player_addr}): {status}",
-                            file=sys.stderr,
-                        )
                         if status in ("Playing", "Paused"):
                             # より優先順位の高いプレイヤーが見つかった
                             print(
-                                f"[DEBUG] Found higher priority player! Switching to {identity}",
+                                f"[INFO] Found higher priority player! Switching to {identity} ({player_addr})",
                                 file=sys.stderr,
                             )
                             self.monitor.current_player = mp
@@ -831,11 +825,7 @@ class LyricsDaemon:
                             # トラック状態をリセットして歌詞を再取得させる
                             self.track_manager.current_trackid = None
                             return
-                except Exception as e:
-                    print(
-                        f"[DEBUG]   Exception checking {player_addr}: {e}",
-                        file=sys.stderr,
-                    )
+                except Exception:
                     continue
 
     @staticmethod
