@@ -5,7 +5,6 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-LYRICS_DIR="$SCRIPT_DIR/lyrics"
 
 # Kill any existing daemon instance
 pkill -f "universal_lyrics.py --daemon" 2>/dev/null || true
