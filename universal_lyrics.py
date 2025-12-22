@@ -109,11 +109,15 @@ def clean_title(title: str, artist: str, player: str) -> tuple[str, str]:
 
     # Special handling for specific artists
     # For ZUTOMAYO, extract content from 『』 and preserve inner brackets like 「」
+    # Also remove half-width parentheses () from the extracted title
     if "ずっと真夜中でいいのに。 ZUTOMAYO" in artist:
         if "『" in title and "』" in title:
             match = re.search(r"『([^』]+)』", title)
             if match:
-                return match.group(1), extracted_artist
+                extracted_title = match.group(1)
+                # Remove half-width parentheses and their contents
+                extracted_title = re.sub(r"\(.*?\)", "", extracted_title).strip()
+                return extracted_title, extracted_artist
 
     # For Spotify, only remove feat./ft. from title
     if "spotify" in player.lower():

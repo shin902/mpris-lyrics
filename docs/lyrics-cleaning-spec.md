@@ -80,15 +80,21 @@ original_title = title  # Keep original for comparison
 ```python
 # Special handling for specific artists
 # For artists like ZUTOMAYO, extract content from 『』 and preserve inner brackets like 「」
+# Also remove half-width parentheses () from the extracted title
 if "ずっと真夜中でいいのに。 ZUTOMAYO" in artist:
     if "『" in title and "』" in title:
         match = re.search(r"『([^』]+)』", title)
         if match:
-            return match.group(1), extracted_artist
+            extracted_title = match.group(1)
+            # Remove half-width parentheses and their contents
+            extracted_title = re.sub(r"\(.*?\)", "", extracted_title).strip()
+            return extracted_title, extracted_artist
 ```
 **処理内容**:
 - 特定のアーティスト（例：「ずっと真夜中でいいのに。」）の場合、『』の中身を抽出し、**即座にリターン**する。
-- これにより、後続の括弧削除や特殊引用符削除の処理を回避し、タイトル内の「」などを保持する。
+- 抽出されたタイトルから **半角括弧 `()` とその中身を削除** する。
+- これにより、後続の括弧削除や特殊引用符削除の処理を回避し、タイトル内の「」などを保持しつつ、不要なメタ情報を除去する。
+- 例: `ずっと真夜中でいいのに。『正義 (Justice)』MV` -> `正義`
 - 例: `ずっと真夜中でいいのに。『Dear. Mr「F」』MV` -> `Dear. Mr「F」`
 
 #### 2.3. Spotify専用処理
