@@ -1,6 +1,6 @@
 # 曲名・アーティスト名のクリーニング処理 完全ドキュメント
 
-**ファイルパス**: `/home/shi/ghq/github.com/shin902/dotfiles-linux/scripts/lyrics/universal_lyrics.py`
+**ファイルパス**: `/home/shi/ghq/github.com/shin902/mpris-lyrics/universal_lyrics.py`
 
 ---
 
@@ -22,7 +22,7 @@
 # Artist name mappings for search queries
 # Maps full artist names to preferred search names
 ARTIST_SEARCH_MAPPINGS = {
-    "ずっと真夜中でいいのに。 ZUTOMAYO": "ZUTOMAYO",
+    "ずっと真夜中でいいのに。 ZUTOMAYO": "ずっと真夜中でいいのに。",
     # Add more artist mappings here as needed
     # "Full Artist Name": "Preferred Search Name",
 }
@@ -39,7 +39,7 @@ ARTIST_SEARCH_MAPPINGS = {
 新しいアーティストを追加する場合、辞書に新しいエントリを追加:
 ```python
 ARTIST_SEARCH_MAPPINGS = {
-    "ずっと真夜中でいいのに。 ZUTOMAYO": "ZUTOMAYO",
+    "ずっと真夜中でいいのに。 ZUTOMAYO": "ずっと真夜中でいいのに。",
     "YOASOBI": "YOASOBI",
     "米津玄師 Kenshi Yonezu": "米津玄師",
 }
@@ -79,7 +79,7 @@ original_title = title  # Keep original for comparison
 #### 2.2. 特定アーティストの特別処理（ずっと真夜中でいいのに。等）
 ```python
 # Special handling for specific artists
-# For ZUTOMAYO, extract content from 『』 and preserve inner brackets like 「」
+# For artists like ZUTOMAYO, extract content from 『』 and preserve inner brackets like 「」
 if "ずっと真夜中でいいのに。 ZUTOMAYO" in artist:
     if "『" in title and "』" in title:
         match = re.search(r"『([^』]+)』", title)
@@ -87,7 +87,7 @@ if "ずっと真夜中でいいのに。 ZUTOMAYO" in artist:
             return match.group(1), extracted_artist
 ```
 **処理内容**:
-- 特定のアーティスト（例：ZUTOMAYO）の場合、『』の中身を抽出し、**即座にリターン**する。
+- 特定のアーティスト（例：「ずっと真夜中でいいのに。」）の場合、『』の中身を抽出し、**即座にリターン**する。
 - これにより、後続の括弧削除や特殊引用符削除の処理を回避し、タイトル内の「」などを保持する。
 - 例: `ずっと真夜中でいいのに。『Dear. Mr「F」』MV` -> `Dear. Mr「F」`
 
@@ -190,10 +190,15 @@ title = re.sub(r"(feat\.|ft\.|featuring).*", "", title, flags=re.IGNORECASE)
 
 ---
 
-#### 2.11. 特殊引用符の削除（廃止）
-~~`title = re.sub(r"[『』「」]", "", title)`~~
-**※この処理は削除されました。**
-理由: `Dear. Mr「F」` のようなタイトル内の意図的な引用符まで削除してしまうため。
+#### 2.11. 特殊引用符の削除
+```python
+# Remove special quotes
+title = re.sub(r"[『』「」]", "", title)
+```
+
+**処理内容**:
+- タイトルに残っている『』や「」を削除する。
+- **注意**: [2.2. 特定アーティストの特別処理](#22-特定アーティストの特別処理ずっと真夜中でいいのに等) で即座にリターンされた場合は、この処理は実行されない。
 
 ---
 
@@ -216,21 +221,21 @@ title = re.sub(r"\s+", " ", title).strip()
 ```
 playerctlから取得
     ↓
-┌─────────────────────────────────────┐
-│ clean_title() でタイトルクリーニング │
-├─────────────────────────────────────┤
-│ 1. 特定アーティスト(ZUTOMAYO等)処理  │
-│    └─ 『』内抽出＆即リターン         │
-│                                      │
-│ 2. Spotify形式の処理                 │
-│ 3. YouTube形式の抽出                 │
-│ 4. 『』括弧の抽出                    │
-│ 5. キーワード括弧の削除              │
-│ 6. 区切り文字の置換                  │
-│ 7. feat./ft. の削除                  │
-│ 8. スペース正規化                    │
-│ 9. "Artist - Title" 抽出             │
-└─────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
+│ clean_title() でタイトルクリーニング          │
+├───────────────────────────────────────────────┤
+│ 1. 特定アーティスト(「ずっと真夜中〜」等)処理 │
+│    └─ 『』内抽出＆即リターン                  │
+│                                               │
+│ 2. Spotify形式の処理                          │
+│ 3. YouTube形式の抽出                          │
+│ 4. 『』括弧の抽出                             │
+│ 5. キーワード括弧の削除                       │
+│ 6. 区切り文字の置換                           │
+│ 7. feat./ft. の削除                           │
+│ 8. 特殊引用符の削除 (特定アーティスト以外)    │
+│ 9. スペース正規化                             │
+└───────────────────────────────────────────────┘
     ↓
 (クリーンなタイトル, アーティスト名)
     ↓

@@ -36,7 +36,7 @@ PLAYER_ORDER = ["brave", "spotify"]
 # Artist name mappings for search queries
 # Maps full artist names to preferred search names
 ARTIST_SEARCH_MAPPINGS = {
-    "ずっと真夜中でいいのに。 ZUTOMAYO": "ZUTOMAYO",
+    "ずっと真夜中でいいのに。 ZUTOMAYO": "ずっと真夜中でいいのに。",
     # Add more artist mappings here as needed
     # "Full Artist Name": "Preferred Search Name",
 }

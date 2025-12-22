@@ -17,47 +17,28 @@ Linux用歌詞取得ツール（MPRIS対応、syncedlyrics使用）を、dotfile
 - [x] Systemd (`lyrics-daemon.service`) と Hyprland (`autostart.conf`) の設定をラッパー経由に変更
 - [x] 新リポジトリ側の `start-lyrics-daemon.sh` のパス修正 (`$LYRICS_DIR` -> `$SCRIPT_DIR`)
 - [x] 新リポジトリ側に `.mise.toml` を配置 (`python = "3.11"`, `uv = "latest"`)
+- [x] `mise trust` および `uv sync` による環境構築完了
+- [x] Git初期化 (`git init`) と初回コミット完了
+- [x] デバッグログの追加（キャッシュキー生成、ヒット確認）
 
 ### 進行中の作業・問題点
-- **`mise` の信頼確認**: 新しいディレクトリ (`mpris-lyrics`) に `.mise.toml` を置いたため、`mise` が実行前に信頼確認（Trust? y/n）を求めていますが、非対話モードで実行したため停止しました。
-- **依存関係の未解決**: `uv sync` がまだ完了していません（`mise` のエラーのため）。
-- **デーモン未起動**: 上記理由により、まだ歌詞取得デーモンは起動していません。
+- **デーモンでの検索ハング**: デーモンモードで実行すると `syncedlyrics` の検索処理が開始されたまま完了せず、JSON出力が更新されない現象が発生中。
+- **キャッシュキーの不一致**: 手動実行とデーモン実行でキャッシュキー生成ロジック（`trackid` 依存）が異なり、手動取得したキャッシュがデーモンでヒットしない。
+    - 手動実行: `artist + title` ベース（成功）
+    - デーモン: `trackid` ベース（検索へ行きハング）
 
-## 3. 次のアクション（新セッションでの指示）
+## 3. 次のアクション
 
-新しいGeminiセッションを `~/ghq/github.com/shin902/mpris-lyrics` で起動し、以下の手順を実行してください。
+1.  **キャッシュキー生成ロジックの変更**:
+    - `universal_lyrics.py` を修正し、`trackid` 依存を排除して常に `artist + title` でキャッシュキーを生成するように統一する。
+    - これにより、手動実行で生成したキャッシュをデーモンが読み込めるようにし、検索処理をバイパスさせる。
 
-1.  **miseの信頼設定**:
-    ```bash
-    mise trust
-    ```
-    を実行して、設定ファイルを信頼してください。
+2.  **動作確認**:
+    - 修正後、手動で歌詞を取得（キャッシュ生成）。
+    - デーモンを再起動し、キャッシュがヒットして正常にJSONが出力されるか確認。
 
-2.  **依存関係のインストール**:
-    ```bash
-    mise install
-    uv sync
-    ```
-    を実行して、仮想環境 (`.venv`) を構築してください。
-
-3.  **デーモンの起動確認**:
-    ```bash
-    ./start-lyrics-daemon.sh
-    # または dotfiles側から
-    ~/ghq/github.com/shin902/dotfiles-linux/scripts/launch-lyrics.sh
-    ```
-    を実行し、`ps aux | grep universal_lyrics` でプロセスが生きているか確認してください。
-
-4.  **Git初期化とコミット**:
-    ```bash
-    git init
-    git add .
-    git commit -m "feat: initial commit of mpris-lyrics fetcher"
-    ```
-    を行い、GitHubへプッシュしてください。
-
-5.  **dotfiles側のクリーンアップ**:
-    元の `dotfiles-linux` リポジトリに戻り、変更（設定ファイルの書き換えとラッパースクリプトの追加）をコミットしてください。
+3.  **dotfiles側のクリーンアップ**:
+    - `dotfiles-linux` リポジトリの変更をコミットする。
 
 ## 4. 関連ファイル
 - **本体**: `universal_lyrics.py` (メインロジック、クリーニング処理含む)
