@@ -516,11 +516,8 @@ class TrackStateManager:
         title = cleaned_title
         artist = extracted_artist or state["artist"]
 
-        # Generate cache key
-        if self.current_trackid:
-            cache_key = hashlib.md5(self.current_trackid.encode()).hexdigest()
-        else:
-            cache_key = hashlib.md5(f"{artist}{title}".encode()).hexdigest()
+        # Generate cache key using artist and title (unified with non-daemon mode)
+        cache_key = hashlib.md5(f"{artist}{title}".encode()).hexdigest()
 
         # Fetch lyrics (uses cache if available)
         self.lyrics_content, _ = get_lyrics(artist, title, cache_key)
@@ -898,14 +895,8 @@ def main():
             print("No track info available.")
         sys.exit(0)
 
-    # Generate cache key using track ID for uniqueness
-    # This prevents mixing up lyrics when browser navigation happens
-    if trackid:
-        # Use track ID as primary key for uniqueness
-        cache_key = hashlib.md5(f"{trackid}".encode()).hexdigest()
-    else:
-        # Fallback to artist+title if no track ID
-        cache_key = hashlib.md5(f"{artist}{title}".encode()).hexdigest()
+    # Generate cache key using artist and title for consistency
+    cache_key = hashlib.md5(f"{artist}{title}".encode()).hexdigest()
 
     # Get lyrics with metadata verification
     lyrics_content, verified_cache_key = get_lyrics(artist, title, cache_key)
