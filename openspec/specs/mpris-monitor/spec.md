@@ -12,6 +12,11 @@ MPRISインターフェースを介してメディアプレーヤーの状態を
 - **WHEN** 「brave」と「spotify」の両方が起動している
 - **THEN** 「brave」が優先的に選択される
 
+#### Scenario: Priority Re-check
+- **WHEN** デーモンモードで動作している
+- **THEN** 5秒ごとに、現在よりも優先順位の高いプレイヤーが再生を開始していないか確認しなければならない。
+- **AND** より高い優先順位のプレイヤーが見つかった場合、即座に接続先を切り替えなければならない。
+
 ### Requirement: Position Interpolation
 MPRISへの負荷を抑えるため、再生位置を補完 **SHALL** しなければならない。
 
