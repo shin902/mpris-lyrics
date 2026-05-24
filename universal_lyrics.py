@@ -14,6 +14,8 @@ import signal
 import subprocess
 import sys
 import time
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -168,6 +170,29 @@ def clean_title(title: str, artist: str, player: str) -> tuple[str, str]:
     return title, extracted_artist
 
 
+def fetch_lrclib(search_query: str) -> Optional[str]:
+    """Lrclib APIを直接叩き、シンクロナイズド歌詞を優先して返す。"""
+    url = "https://lrclib.net/api/search?" + urllib.parse.urlencode({"q": search_query})
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            tracks = json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+    if not tracks:
+        return None
+
+    # シンクロナイズド歌詞があるエントリを優先
+    for track in tracks:
+        synced = (track.get("syncedLyrics") or "").strip()
+        if synced:
+            return synced
+
+    # なければ先頭のプレーン歌詞にフォールバック
+    plain = (tracks[0].get("plainLyrics") or "").strip()
+    return plain if plain else None
+
+
 def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
     """Fetch lyrics using syncedlyrics and cache the result.
     Returns (lyrics_content, cache_key_used)."""
@@ -237,10 +262,16 @@ def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
     if sys.argv and '--daemon' in sys.argv:
         print(f"[Lyrics Search] Query: '{search_query}' (Title: '{title}', Artist: '{artist}')", flush=True)
 
-    # Use reliable providers only (exclude Megalobiz which often fails)
-    lrc_content = syncedlyrics.search(
-        search_query, providers=["Lrclib", "NetEase"]
-    )
+    # Lrclib を直接呼び出し（シンクロナイズド歌詞優先）
+    lrc_content = fetch_lrclib(search_query)
+
+    # Lrclib でシンクロナイズドが取れなかった場合 NetEase にフォールバック
+    if not lrc_content or not is_synced_lyrics(lrc_content):
+        netease_content = syncedlyrics.search(
+            search_query, providers=["NetEase"], synced_only=True
+        )
+        if netease_content:
+            lrc_content = netease_content
 
     if lrc_content:
         cache_file.write_text(lrc_content)
