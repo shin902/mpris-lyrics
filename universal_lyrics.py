@@ -45,6 +45,14 @@ ARTIST_SEARCH_MAPPINGS = {
     # "Full Artist Name": "Preferred Search Name",
 }
 
+# Title query overrides for exact title matches
+# Maps exact track titles (after clean_title) to specific search queries
+TITLE_QUERY_OVERRIDES: dict[str, str] = {
+    "ワールドイズマイン - Anime ver. - CPK! Remix": "ワールドイズマイン かぐや&月見ヤチヨ ver. CPK! Remix",
+    # Add more overrides here as needed
+    # "Exact Title": "Search Query",
+}
+
 
 def run_playerctl(player: str, *args) -> Optional[str]:
     """Run playerctl command and return output."""
@@ -246,17 +254,21 @@ def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
     def make_query(t: str) -> str:
         return f"{t} {search_artist}".strip() if search_artist else t
 
-    # タイトルのバリアント生成（精度の高い順）
-    # v1: feat. のみ除去
-    title_v1 = re.sub(r"[\(\[\【].*?(feat\.|ft\.|featuring).*?[\)\]\】]", "", title, flags=re.IGNORECASE)
-    title_v1 = re.sub(r"(feat\.|ft\.|featuring).*", "", title_v1, flags=re.IGNORECASE)
-    title_v1 = re.sub(r"\s+", " ", title_v1).strip()
-    # v2: - 以降も除去
-    title_v2 = title_v1.split(" - ")[0].strip()
+    # 曲名完全一致のオーバーライド
+    if title in TITLE_QUERY_OVERRIDES:
+        queries = [TITLE_QUERY_OVERRIDES[title]]
+    else:
+        # タイトルのバリアント生成（精度の高い順）
+        # v1: feat. のみ除去
+        title_v1 = re.sub(r"[\(\[\【].*?(feat\.|ft\.|featuring).*?[\)\]\】]", "", title, flags=re.IGNORECASE)
+        title_v1 = re.sub(r"(feat\.|ft\.|featuring).*", "", title_v1, flags=re.IGNORECASE)
+        title_v1 = re.sub(r"\s+", " ", title_v1).strip()
+        # v2: - 以降も除去
+        title_v2 = title_v1.split(" - ")[0].strip()
 
-    queries = [make_query(title_v1)]
-    if title_v2 != title_v1:
-        queries.append(make_query(title_v2))
+        queries = [make_query(title_v1)]
+        if title_v2 != title_v1:
+            queries.append(make_query(title_v2))
 
     if sys.argv and "--daemon" in sys.argv:
         print(f"[Lyrics Search] Queries: {queries} (Title: '{title}', Artist: '{artist}')", flush=True)
