@@ -170,27 +170,27 @@ def clean_title(title: str, artist: str, player: str) -> tuple[str, str]:
     return title, extracted_artist
 
 
-def fetch_lrclib(search_query: str) -> Optional[str]:
-    """Lrclib APIを直接叩き、シンクロナイズド歌詞を優先して返す。"""
+def fetch_lrclib(search_query: str) -> tuple[Optional[str], Optional[str]]:
+    """Lrclib APIを直接叩く。(synced, plain) のタプルを返す。"""
     url = "https://lrclib.net/api/search?" + urllib.parse.urlencode({"q": search_query})
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
             tracks = json.loads(resp.read().decode())
     except Exception:
-        return None
+        return None, None
 
     if not tracks:
-        return None
+        return None, None
 
-    # シンクロナイズド歌詞があるエントリを優先
+    synced = None
     for track in tracks:
-        synced = (track.get("syncedLyrics") or "").strip()
-        if synced:
-            return synced
+        s = (track.get("syncedLyrics") or "").strip()
+        if s:
+            synced = s
+            break
 
-    # なければ先頭のプレーン歌詞にフォールバック
-    plain = (tracks[0].get("plainLyrics") or "").strip()
-    return plain if plain else None
+    plain = (tracks[0].get("plainLyrics") or "").strip() or None
+    return synced, plain
 
 
 def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
@@ -230,48 +230,57 @@ def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
             return lyrics_content, cache_key
 
     # Search for lyrics
-    # Check if artist has a specific mapping
+    # Determine search artist
     if artist and artist in ARTIST_SEARCH_MAPPINGS:
-        # Use mapped artist name directly without further processing
         search_artist = ARTIST_SEARCH_MAPPINGS[artist]
-        search_query = f"{title} {search_artist}".strip()
+    elif artist:
+        cleaned_chars = [
+            c for c in artist
+            if not (0x1F000 <= ord(c) <= 0x1FFFF or 0xFF00 <= ord(c) <= 0xFFEF)
+        ]
+        clean_artist = "".join(cleaned_chars).strip()
+        search_artist = clean_artist if clean_artist and len(clean_artist) < 30 else ""
     else:
-        # Clean up artist name: remove emojis and full-width alphanumerics
-        clean_artist = artist
-        if artist:
-            # Remove emojis (U+1F000-U+1FFFF range and other common emoji ranges)
-            # Remove full-width alphanumerics (U+FF00-U+FFEF)
-            cleaned_chars = []
-            for char in artist:
-                code_point = ord(char)
-                # Skip emojis and full-width alphanumerics
-                if (0x1F000 <= code_point <= 0x1FFFF or  # Emojis and symbols
-                    0xFF00 <= code_point <= 0xFFEF):      # Full-width forms
-                    continue
-                cleaned_chars.append(char)
-            clean_artist = ''.join(cleaned_chars).strip()
+        search_artist = ""
 
-        # Use artist name in search if it's reasonably short
-        if clean_artist and len(clean_artist) < 30:
-            search_query = f"{title} {clean_artist}".strip()
-        else:
-            # Very long artist name or no artist - search by title only
-            search_query = title
+    def make_query(t: str) -> str:
+        return f"{t} {search_artist}".strip() if search_artist else t
 
-    # Log search query (only in daemon mode to avoid log spam)
-    if sys.argv and '--daemon' in sys.argv:
-        print(f"[Lyrics Search] Query: '{search_query}' (Title: '{title}', Artist: '{artist}')", flush=True)
+    # タイトルのバリアント生成（精度の高い順）
+    # v1: feat. のみ除去
+    title_v1 = re.sub(r"[\(\[\【].*?(feat\.|ft\.|featuring).*?[\)\]\】]", "", title, flags=re.IGNORECASE)
+    title_v1 = re.sub(r"(feat\.|ft\.|featuring).*", "", title_v1, flags=re.IGNORECASE)
+    title_v1 = re.sub(r"\s+", " ", title_v1).strip()
+    # v2: - 以降も除去
+    title_v2 = title_v1.split(" - ")[0].strip()
 
-    # Lrclib を直接呼び出し（シンクロナイズド歌詞優先）
-    lrc_content = fetch_lrclib(search_query)
+    queries = [make_query(title_v1)]
+    if title_v2 != title_v1:
+        queries.append(make_query(title_v2))
 
-    # Lrclib でシンクロナイズドが取れなかった場合 NetEase にフォールバック
-    if not lrc_content or not is_synced_lyrics(lrc_content):
-        netease_content = syncedlyrics.search(
-            search_query, providers=["NetEase"], synced_only=True
-        )
+    if sys.argv and "--daemon" in sys.argv:
+        print(f"[Lyrics Search] Queries: {queries} (Title: '{title}', Artist: '{artist}')", flush=True)
+
+    # 段階的フォールバック検索
+    # 1. synced: title_v1  2. synced: title_v2  3. plain: title_v1（追加リクエストなし）
+    lrc_content = None
+    plain_fallback = None
+
+    for query in queries:
+        synced, plain = fetch_lrclib(query)
+        if plain_fallback is None and plain:
+            plain_fallback = plain
+        if synced:
+            lrc_content = synced
+            break
+
+    if not lrc_content:
+        # NetEase で synced を試みる
+        netease_content = syncedlyrics.search(queries[-1], providers=["NetEase"], synced_only=True)
         if netease_content:
             lrc_content = netease_content
+        else:
+            lrc_content = plain_fallback
 
     if lrc_content:
         cache_file.write_text(lrc_content)
@@ -610,7 +619,7 @@ class MPRISPlayerMonitor:
                         )
                         if status in ("Playing", "Paused"):
                             self.current_player = mp
-                            self.current_player_name = player_addr
+                            self.current_player_name = identity
                             print(
                                 f"[DEBUG]   Selected player: {identity} ({player_addr})",
                                 file=sys.stderr,
@@ -856,7 +865,7 @@ class LyricsDaemon:
                                 file=sys.stderr,
                             )
                             self.monitor.current_player = mp
-                            self.monitor.current_player_name = player_addr
+                            self.monitor.current_player_name = identity
                             # トラック状態をリセットして歌詞を再取得させる
                             self.track_manager.current_trackid = None
                             return
