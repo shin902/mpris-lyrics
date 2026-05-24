@@ -239,7 +239,7 @@ def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
 
     # Use reliable providers only (exclude Megalobiz which often fails)
     lrc_content = syncedlyrics.search(
-        search_query, providers=["Lrclib", "Musixmatch", "NetEase", "Genius"]
+        search_query, providers=["Lrclib", "NetEase"]
     )
 
     if lrc_content:
