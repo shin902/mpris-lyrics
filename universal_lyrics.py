@@ -48,8 +48,7 @@ ARTIST_SEARCH_MAPPINGS = {
 # Title query overrides for exact title matches
 # Maps exact track titles (after clean_title) to specific search queries
 TITLE_QUERY_OVERRIDES: dict[str, str] = {
-    "ワールドイズマイン - Anime ver. - CPK! Remix": "ワールドイズマイン かぐや&月見ヤチヨ ver. CPK! Remix",
-    # Add more overrides here as needed
+    # Add exact title overrides here as needed
     # "Exact Title": "Search Query",
 }
 
@@ -128,6 +127,11 @@ def clean_title(title: str, artist: str, player: str) -> tuple[str, str]:
                 # Remove half-width parentheses and their contents
                 extracted_title = re.sub(r"\(.*?\)", "", extracted_title).strip()
                 return extracted_title, extracted_artist
+
+    # "Anime ver." はlrclibに専用エントリがないため除去して検索精度を上げる
+    if "Anime ver." in title:
+        title = re.sub(r"\s*-\s*Anime ver\.", "", title).strip()
+        return title, extracted_artist
 
     # For Spotify, only remove feat./ft. from title
     if "spotify" in player.lower():
