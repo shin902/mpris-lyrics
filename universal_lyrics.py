@@ -291,14 +291,14 @@ def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
             break
 
     if not lrc_content:
-        # NetEase → Musixmatch の順で synced を試みる
+        # NetEase → Genius の順でフォールバック
         netease_content = syncedlyrics.search(queries[-1], providers=["NetEase"], synced_only=True)
         if netease_content:
             lrc_content = netease_content
         else:
-            musixmatch_content = syncedlyrics.search(queries[-1], providers=["Musixmatch"])
-            if musixmatch_content:
-                lrc_content = musixmatch_content
+            genius_content = syncedlyrics.search(queries[-1], providers=["Genius"])
+            if genius_content:
+                lrc_content = genius_content
             else:
                 lrc_content = plain_fallback
 
