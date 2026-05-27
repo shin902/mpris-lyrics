@@ -358,7 +358,7 @@ def find_current_line(lyrics_lines: list[str], position: float) -> int:
 
 def strip_timestamp(line: str) -> str:
     """Remove timestamp from lyric line."""
-    return re.sub(r"^\[[^\]]*\]\s*", "", line)
+    return re.sub(r"^\[[^\]]*\]\s*", "", line).rstrip("\r")
 
 
 def output_json(lyrics_lines: list[str], position: float, is_synced: bool) -> str:
@@ -590,7 +590,7 @@ class TrackStateManager:
 
         # Parse lyrics
         if self.lyrics_content:
-            self.lyrics_lines = self.lyrics_content.strip().split("\n")
+            self.lyrics_lines = self.lyrics_content.strip().splitlines()
             self.is_synced = is_synced_lyrics(self.lyrics_content)
         else:
             self.lyrics_lines = []
