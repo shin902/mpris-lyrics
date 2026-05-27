@@ -291,12 +291,16 @@ def get_lyrics(artist: str, title: str, cache_key: str) -> tuple[str, str]:
             break
 
     if not lrc_content:
-        # NetEase で synced を試みる
+        # NetEase → Musixmatch の順で synced を試みる
         netease_content = syncedlyrics.search(queries[-1], providers=["NetEase"], synced_only=True)
         if netease_content:
             lrc_content = netease_content
         else:
-            lrc_content = plain_fallback
+            musixmatch_content = syncedlyrics.search(queries[-1], providers=["Musixmatch"])
+            if musixmatch_content:
+                lrc_content = musixmatch_content
+            else:
+                lrc_content = plain_fallback
 
     if lrc_content:
         cache_file.write_text(lrc_content)
