@@ -382,8 +382,8 @@ def output_json(lyrics_lines: list[str], position: float, is_synced: bool) -> st
 
         return json.dumps({"status": "ok", "lines": lines}, ensure_ascii=False)
     else:
-        # Non-synced lyrics
-        lines = [{"text": line, "current": False} for line in lyrics_lines[:10] if line]
+        # Non-synced lyrics: 全行送る（ewwでスクロール可能にするため）
+        lines = [{"text": line, "current": False} for line in lyrics_lines if line]
         return json.dumps({"status": "ok", "lines": lines}, ensure_ascii=False)
 
 
@@ -892,11 +892,17 @@ class LyricsDaemon:
                 except Exception:
                     continue
 
-    @staticmethod
-    def _write_json_file(data: dict) -> None:
-        """Write JSON to daemon output file (atomic write)."""
+    _last_written_json: str = ""
+
+    @classmethod
+    def _write_json_file(cls, data: dict) -> None:
+        """Write JSON to daemon output file (atomic write). Skip if content unchanged."""
         try:
             json_str = json.dumps(data, ensure_ascii=False)
+            # 内容が前回と同じなら書き込みスキップ（ewwのスクロール位置保持のため）
+            if json_str == cls._last_written_json:
+                return
+            cls._last_written_json = json_str
             # Atomic write: write to temp file first, then rename
             temp_file = DAEMON_OUTPUT_FILE.with_suffix(".tmp")
             temp_file.write_text(json_str)
